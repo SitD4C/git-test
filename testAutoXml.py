@@ -2,7 +2,11 @@ import json
 from operator import mod
 from xml.etree import ElementTree as ET
 import re
+import os
 import logging
+import zipfile
+import py7zr
+
 
 log_file = "D:\\Git Project\\测试用\\日志.txt"
 logger = logging.getLogger(__name__)
@@ -17,6 +21,47 @@ sh.setLevel(logging.WARNING)
 stream_formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s')
 sh.setFormatter(stream_formatter)
 logger.addHandler(sh)
+
+
+
+
+
+# # 解压缩
+# with py7zr.SevenZipFile("Archive.7z", 'r') as archive:
+#     archive.extractall(path="/tmp")
+
+
+# # 这一部分只是用来解释os.walk的用法，在该脚本运行时不需执行------start
+# dirpath = r'D:\\Git Project\\测试用'  # 这里指定需要压缩的文件夹
+# for path, dirnames, filenames in os.walk(dirpath):  # 遍历文件夹及下面的子文件夹，path、dirnames、filenames依次是路径、目录名称、文件名称。
+# # path是当前路径，dirnames是在当前路径下有文件夹时，给出文件夹名的列表，filenames是在当前路径下有文件时，给出文件名的列表
+# # 之后进入列表dirnames中的第一个文件夹，重复上述过程。
+#     # 下面print出来可以更好体会os.walk的用法
+#     print(path)
+#     print(dirnames)
+#     print(filenames)
+#     fpath = path.replace(dirpath, '')  # 把主路径去掉，只保留分路径，这样在压缩文件时就不会把需要压缩的文件夹的上层路径压缩进去
+#     print(fpath)
+# # 这一部分只是用来解释os.walk的用法，在该脚本运行时不需执行------end
+
+
+def getZipDir(dirpath, outFullName):
+    """
+    压缩指定文件夹
+    :param dirpath: 目标文件夹路径
+    :param outFullName: 压缩文件保存路径+xxxx.zip
+    :return: 无
+    """
+    zip = zipfile.ZipFile(outFullName, "w", zipfile.ZIP_DEFLATED)  # outFullName为压缩文件的完整路径
+    for path, dirnames, filenames in os.walk(dirpath):
+        # 去掉目标跟路径，只对目标文件夹下边的文件及文件夹进行压缩
+        fpath = path.replace(dirpath, '')
+
+        for filename in filenames:
+            zip.write(os.path.join(path, filename), os.path.join(fpath, filename))
+    zip.close()
+
+
 
 
 def autoXml():
@@ -63,5 +108,9 @@ def prettyXml(element, indent = '', newline = '\n', level=0):
 
  
 if __name__ == "__main__":
-    autoXml()
-    logger.warning('Mission ComplETe')
+    # areas = ['chinaocean', 'NWPacific', 'NEPacific', 'SWPacific', 'SEPacific', 'IndianOcean']
+    # for area in areas:
+    #     getZipDir('D:\\Git Project\\测试用', 'D:\\Git Project\\测试用' + '.7z')
+     # 压缩
+    with py7zr.SevenZipFile("D:\\Git Project\\测试用", 'w') as archive:
+        archive.writeall("D:\\Git Project\\测试用2.7z")
