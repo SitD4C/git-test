@@ -1,0 +1,119 @@
+支持N个sheet的拆分，完整代码如下：
+from openpyxl import load_workbook
+import os
+
+
+def combine_range(row_nums):
+    row_nums = iter(sorted(row_nums))
+    res = []
+    try:
+        start = prev = next(row_nums)
+    except StopIteration:
+        return res
+    for row_num in row_nums:
+        if row_num != prev+1:
+            res.append((start, prev))
+            start = row_num
+        prev = row_num
+    res.append((start, prev))
+    return res
+
+
+filename = "多sheet拆分.xlsx"
+dest = "result"  # 要保存的目标文件夹
+sht_names = ["要拆的表1", "要拆的表2"] # 所有被拆分的sheet列表
+group_nums = [3, 7] # 每个被拆分的sheet对应的分组列号
+title_rows = [7, 4] # 每个被拆分的sheet对应的标题行最后一行的行号
+
+book = load_workbook(filename)
+shts = [book[sht_name] for sht_name in sht_names]
+
+# 读取每个分组值在两个sheet中对应的行号
+data = {}
+for i, (sht, group_num, title_row) in enumerate(zip(shts, group_nums, title_rows)):
+    for cell, in sht.iter_rows(min_row=title_row+1, min_col=group_num, max_col=group_num):
+        if cell.value is None:
+            # 跳过空白的分组字段
+            continue
+        data.setdefault(cell.value, [set()]*len(shts))[i].add(cell.row)
+
+# 获取每个sheet的全部行号范围
+ids_all = [set(range(title_row+1, sht.max_row+1))
+           for title_row, sht in zip(title_rows, shts)]
+
+# 若保存结果的文件夹不存在则创建
+os.makedirs(dest, exist_ok=True)
+for name, ids_src_all in data.items():
+    print(name)
+    new_book = load_workbook(filename)
+    new_sheets = [new_book[sht_name] for sht_name in sht_names]
+    # 还原到与原文件一致的列宽
+    for new_sheet, sht in zip(new_sheets, shts):
+        new_sheet.column_dimensions = sht.column_dimensions
+    # 删除多余的sheet
+    for sheetname in book.sheetnames:
+        if sheetname in sht_names:
+            continue
+        del new_book[sheetname]
+    # 删除不属于当前文件的行
+    for ids, ids_src, new_sheet in zip(ids_all, ids_src_all, new_sheets):
+        for start, end in reversed(combine_range(ids-ids_src)):
+            new_sheet.delete_rows(start, end-start+1)
+    # 保存拆分结果到文件
+    new_book.save(f"{dest}/{name}.xlsx")
+
+
+分文件拆分
+from openpyxl import load_workbook
+import os
+
+
+def combine_range(row_nums):
+    row_nums = iter(sorted(row_nums))
+    res = []
+    try:
+        start = prev = next(row_nums)
+    except StopIteration:
+        return res
+    for row_num in row_nums:
+        if row_num != prev+1:
+            res.append((start, prev))
+            start = row_num
+        prev = row_num
+    res.append((start, prev))
+    return res
+
+
+def split_excel(filename, save_name, group_num, title_row=1):
+    """
+    保存名称是Excel文件时表示保存到单个文件中
+    保存名称是目录时，表示每个sheet保存到单个文件中
+    """
+    book = load_workbook(filename, data_only=True)
+    sheet = book.active
+    row = next(sheet.iter_rows(min_row=title_row, max_row=title_row))
+    if isinstance(group_num, str):
+        for i, cell in enumerate(row, 1):
+            if group_num == cell.value:
+                group_num = i
+                break
+    data = {}
+    for cell, in sheet.iter_rows(min_row=title_row+1, min_col=group_num, max_col=group_num):
+        data.setdefault(cell.value, set()).add(cell.row)
+    ids = set(range(title_row+1, sheet.max_row+1))
+    if not save_name.endswith(".xlsx") and not os.path.exists(save_name):
+        os.makedirs(save_name)
+    for name, ids_src in data.items():
+        if save_name.endswith(".xlsx"):
+            new_sheet = book.copy_worksheet(sheet)
+        else:
+            new_book = load_workbook(filename, data_only=True)
+            new_sheet = new_book.active
+        new_sheet.title = name
+        new_sheet.column_dimensions = sheet.column_dimensions
+        for start, end in reversed(combine_range(ids-ids_src)):
+            new_sheet.delete_rows(start, end-start+1)
+        if not save_name.endswith(".xlsx"):
+            new_book.save(f"{save_name}/{name}.xlsx")
+    if save_name.endswith(".xlsx"):
+        book.save(save_name)
